@@ -7,4 +7,4 @@ const kheight20 = SizedBox(height: 20);
 const kheight100 = SizedBox(height: 100);
 const kwidth5 = SizedBox(width: 5);
 
-const baseUrl = 'http://10.0.2.2:8000/';
+const baseUrl = 'https://catering-backend.devforchange.com/';

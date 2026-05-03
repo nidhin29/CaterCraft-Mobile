@@ -224,6 +224,9 @@ class _LoginPageState extends State<LoginPage> {
           );
         },
         builder: (context, state) {
+          final double screenWidth = MediaQuery.of(context).size.width;
+          final bool isSmallScreen = screenWidth < 600;
+
           return Stack(
             children: [
               // Background Gradient
@@ -238,10 +241,15 @@ class _LoginPageState extends State<LoginPage> {
               ),
               Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 20 : 24,
+                    vertical: 24,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 500),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                       // Header (Logo)
                       Container(
                         width: 100,
@@ -280,7 +288,7 @@ class _LoginPageState extends State<LoginPage> {
                       // Glassmorph Card
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 500),
-                        padding: const EdgeInsets.all(32),
+                        padding: EdgeInsets.all(isSmallScreen ? 24 : 32),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(30),
@@ -302,7 +310,7 @@ class _LoginPageState extends State<LoginPage> {
                                 "Welcome Back",
                                 style: GoogleFonts.outfit(
                                   color: Colors.white,
-                                  fontSize: 28,
+                                  fontSize: isSmallScreen ? 24 : 28,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -453,7 +461,8 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                       ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -75,6 +75,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isSmallScreen = screenWidth < 600;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -104,21 +107,27 @@ class _RegisterPageState extends State<RegisterPage> {
             builder: (context, state) {
               return Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Text(
-                        "JOIN CATERCRAFT",
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 20 : 40,
+                    vertical: 24,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 500),
+                    child: Column(
+                      children: [
+                        Text(
+                          "JOIN CATERCRAFT",
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: isSmallScreen ? 28 : 32,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: isSmallScreen ? 4 : 8,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 40),
-                      Container(
-                        padding: const EdgeInsets.all(32),
+                        const SizedBox(height: 40),
+                        Container(
+                          padding: EdgeInsets.all(isSmallScreen ? 24 : 32),
                         decoration: AppTheme.glassDecoration(),
                         child: Form(
                           key: _formKey,
@@ -266,11 +275,12 @@ class _RegisterPageState extends State<RegisterPage> {
                                 ),
                                 child: const Text("Already have an account? Sign In", style: TextStyle(color: Colors.white54)),
                               ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
