@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
+import 'package:catering/Domain/Notification/notification_model.dart';
 import 'package:catering/Presentation/Home/notifications_screen.dart';
 import 'package:catering/main.dart';
 import 'package:catering/Domain/Security/security_service.dart';
@@ -11,6 +14,8 @@ class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+
+  static const String _prefsKey = 'saved_notifications';
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
@@ -61,8 +66,9 @@ class NotificationService {
         ?.createNotificationChannel(_channel);
 
     // 3. Listen for Foreground Messages (Both Notification and Data)
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       debugPrint('Foreground Message received');
+      await saveNotificationLocally(message);
       _showLocalNotification(message);
       
       // Broadcast to any listening Cubits for UI refresh
@@ -88,6 +94,70 @@ class NotificationService {
       debugPrint("FCM Token: $token");
     } catch (e) {
       debugPrint("FCM Token Retrieval Timeout or Error: $e");
+    }
+  }
+
+  Future<void> saveNotificationLocally(RemoteMessage message) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      String title = message.notification?.title ?? message.data['title'] ?? 'New Notification';
+      String body = message.notification?.body ?? 'You have a new message';
+      String type = message.data['type'] ?? 'system';
+
+      if (message.data['isEncrypted'] == 'true' || message.data['encryptedBody'] != null) {
+        final encryptedBody = message.data['encryptedBody'];
+        final nonce = message.data['nonce'];
+        final senderPubKey = message.data['senderPublicKey'];
+
+        if (encryptedBody != null && nonce != null && senderPubKey != null) {
+          try {
+            final security = SecurityService(); 
+            body = await security.decryptText(
+              ciphertextBase64: encryptedBody,
+              nonceBase64: nonce,
+              senderPublicKey: senderPubKey,
+            );
+          } catch (e) {
+            body = "🔒 New encrypted message";
+          }
+        }
+      }
+
+      final notification = NotificationModel(
+        id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        title: title,
+        message: body,
+        timestamp: message.sentTime ?? DateTime.now(),
+        type: type,
+        isRead: false,
+      );
+
+      List<String> savedList = prefs.getStringList(_prefsKey) ?? [];
+      savedList.insert(0, jsonEncode(notification.toJson()));
+      
+      if (savedList.length > 50) {
+        savedList = savedList.sublist(0, 50);
+      }
+      
+      await prefs.setStringList(_prefsKey, savedList);
+      
+      // Broadcast model so active screens can update immediately
+      _onNotificationReceivedController.add({'model': notification.toJson(), ...message.data});
+      
+    } catch (e) {
+      debugPrint('Error saving notification: $e');
+    }
+  }
+
+  Future<List<NotificationModel>> getSavedNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedList = prefs.getStringList(_prefsKey) ?? [];
+      return savedList.map((jsonStr) => NotificationModel.fromJson(jsonDecode(jsonStr))).toList();
+    } catch (e) {
+      debugPrint('Error getting saved notifications: $e');
+      return [];
     }
   }
 
@@ -176,6 +246,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint("Handling a background message: ${message.messageId}");
   
-  // Directly use the logic to show notification (Decryption happens inside)
-  await NotificationService()._showLocalNotification(message);
+  // The OS already shows notifications automatically when the 'notification' payload is present
+  // We only need to manually show it if it's a data-only message (e.g. E2EE encrypted)
+  await NotificationService().saveNotificationLocally(message);
+  
+  if (message.notification == null) {
+    await NotificationService()._showLocalNotification(message);
+  }
 }

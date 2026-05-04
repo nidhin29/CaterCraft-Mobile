@@ -40,7 +40,7 @@ class OwnerCubit extends Cubit<OwnerState> {
     this._chatService,
     this._securityService,
   ) : super(OwnerState.initial()) {
-    _loadMocks();
+    _loadNotifications();
     _setupGlobalMessageListener();
     _setupGlobalTypingListener();
     _setupNotificationListener();
@@ -123,6 +123,12 @@ class OwnerCubit extends Cubit<OwnerState> {
     _notificationSubscription = NotificationService().onNotificationReceived.listen((data) {
       if (isClosed) return;
       
+      if (data.containsKey('model')) {
+        final newNotif = NotificationModel.fromJson(data['model'] as Map<String, dynamic>);
+        final updated = [newNotif, ...state.notifications];
+        emit(state.copyWith(notifications: updated));
+      }
+
       final type = data['type'];
       log("🔔 OwnerCubit received notification event: $type");
       
@@ -133,31 +139,9 @@ class OwnerCubit extends Cubit<OwnerState> {
     });
   }
 
-  void _loadMocks() {
-    final mocks = [
-      NotificationModel(
-        id: '1',
-        title: 'New Booking Request',
-        message: 'A new catering request for "Wedding Reception" has been received.',
-        timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-        type: 'booking',
-      ),
-      NotificationModel(
-        id: '2',
-        title: 'Service Updated',
-        message: 'Your "Premium Buffet" service has been successfully updated.',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-        type: 'service',
-      ),
-      NotificationModel(
-        id: '3',
-        title: 'System Update',
-        message: 'CaterCraft v1.2 is now available with new features.',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-        type: 'system',
-      ),
-    ];
-    emit(state.copyWith(notifications: mocks));
+  Future<void> _loadNotifications() async {
+    final notifications = await NotificationService().getSavedNotifications();
+    emit(state.copyWith(notifications: notifications));
   }
 
   Future<void> fetchBookings() async {
@@ -410,6 +394,9 @@ class OwnerCubit extends Cubit<OwnerState> {
     if (token != null) {
       log("Syncing FCM Token: $token");
       await _ownerService.updateProfile(fcmToken: token);
+      log("✅ FCM Token Synced successfully to backend");
+    } else {
+      log("⚠️ No FCM Token retrieved from Firebase Messaging");
     }
   }
 

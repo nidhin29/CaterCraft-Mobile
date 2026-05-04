@@ -22,6 +22,11 @@ class DashboardTab extends StatelessWidget {
               final owner = state.ownerDetails.fold(() => null, (u) => u);
               final isVerified = owner?.verificationStatus?.toLowerCase() == "verified";
 
+              // Calculate active events and requests awaiting approval
+              final activeStatuses = ["Accepted", "Approved", "In Kitchen", "Dispatched", "Confirmed"];
+              final activeCount = state.bookings.where((b) => activeStatuses.contains(b.status)).length;
+              final pendingCount = state.bookings.where((b) => b.status == "Pending").length;
+
               return Padding(
                 padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
                 child: Column(
@@ -33,7 +38,7 @@ class DashboardTab extends StatelessWidget {
                     ],
                     _buildWelcomeHeader(owner?.companyName ?? "CaterCraft"),
                     const SizedBox(height: 32),
-                    _buildStatSection(),
+                    _buildStatSection(activeCount, pendingCount),
                     const SizedBox(height: 40),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -153,12 +158,12 @@ class DashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _buildStatSection() {
+  Widget _buildStatSection(int activeCount, int pendingCount) {
     return Row(
       children: [
-        _statBlock("Active Ev.", "12", Icons.dashboard_customize_rounded, AppTheme.statusConfirmed),
+        _statBlock("Active Ev.", activeCount.toString().padLeft(2, '0'), Icons.dashboard_customize_rounded, AppTheme.statusConfirmed),
         const SizedBox(width: 20),
-        _statBlock("Req. Appr.", "05", Icons.pending_actions_rounded, AppTheme.statusPending),
+        _statBlock("Req. Appr.", pendingCount.toString().padLeft(2, '0'), Icons.pending_actions_rounded, AppTheme.statusPending),
       ],
     );
   }

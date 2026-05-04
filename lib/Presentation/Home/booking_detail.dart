@@ -457,31 +457,16 @@ class BookingDetailScreen extends StatelessWidget {
         ),
       );
     } else if (booking.status == "Approved" || booking.status == "Accepted" || booking.status == "Confirmed") {
-      final bool isPaid = booking.paymentStatus == "Paid" || booking.razorpayOrderId != null;
-
-      if (!isPaid && isOwner) {
-        buttons.add(
-          const Expanded(
-            child: Center(
-              child: Text(
-                "Waiting for Customer Payment...",
-                style: TextStyle(color: Colors.white38, fontStyle: FontStyle.italic, fontSize: 13),
-              ),
-            ),
+      buttons.add(
+        Expanded(
+          child: _actionButton(
+            context,
+            "Move to Kitchen",
+            AppTheme.ownerAccent,
+            () => _confirmStatusChange(context, booking, "In Kitchen", "Move this booking to the kitchen?"),
           ),
-        );
-      } else {
-        buttons.add(
-          Expanded(
-            child: _actionButton(
-              context,
-              "Move to Kitchen",
-              AppTheme.ownerAccent,
-              () => _confirmStatusChange(context, booking, "In Kitchen", "Move this booking to the kitchen?"),
-            ),
-          ),
-        );
-      }
+        ),
+      );
     } else if (booking.status == "In Kitchen") {
       buttons.add(
         Expanded(
