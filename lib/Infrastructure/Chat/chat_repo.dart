@@ -7,15 +7,29 @@ import 'package:catering/Domain/Failure/failure.dart';
 import 'package:dartz/dartz.dart';
 import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
+import 'package:catering/Infrastructure/Chat/chat_local_db.dart';
 
 @LazySingleton(as: ChatService)
 class ChatRepo implements ChatService {
   final Dio _dio;
+  final ChatLocalDb _localDb;
+  
+  // In-memory cache for chat history [RoomID -> Messages]
+  final Map<String, List<MessageModel>> _historyCache = {};
 
-  ChatRepo(this._dio);
+  ChatRepo(this._dio, this._localDb);
 
   @override
   Future<Either<MainFailure, List<MessageModel>>> getChatHistory(String roomId, {int page = 1, int limit = 50}) async {
+    // If page 1 is requested, try to load from local DB first if cache is empty
+    if (page == 1 && _historyCache[roomId] == null) {
+      final localHistory = await _localDb.getHistory(roomId);
+      if (localHistory.isNotEmpty) {
+        _historyCache[roomId] = localHistory;
+        log('📦 Loaded ${localHistory.length} messages from Local DB for room: $roomId');
+      }
+    }
+    
     try {
       final response = await _dio.get(
         'api/v1/chat/history/$roomId',
@@ -30,6 +44,10 @@ class ChatRepo implements ChatService {
             ? (rawData['messages'] as List)
             : (rawData as List? ?? []);
         final history = data.map((json) => MessageModel.fromJson(json as Map<String, dynamic>)).toList();
+        
+        // We DO NOT populate the cache here because these are ENCRYPTED.
+        // The Cubit will call updateCachedMessages after decryption.
+        
         return Right(history);
       }
       return const Left(MainFailure.serverFailure());
@@ -37,6 +55,29 @@ class ChatRepo implements ChatService {
       log('Get History Error: $e');
       return const Left(MainFailure.serverFailure());
     }
+  }
+
+  @override
+  Future<void> preLoadFromDisk(String roomId) async {
+    if (_historyCache[roomId] == null) {
+      final localHistory = await _localDb.getHistory(roomId);
+      if (localHistory.isNotEmpty) {
+        _historyCache[roomId] = localHistory;
+        log('📦 Pre-loaded ${localHistory.length} messages from Disk for room: $roomId');
+      }
+    }
+  }
+
+  @override
+  List<MessageModel>? getCachedMessages(String roomId) {
+    return _historyCache[roomId];
+  }
+
+  @override
+  void updateCachedMessages(String roomId, List<MessageModel> messages) {
+    _historyCache[roomId] = messages;
+    // Also update local storage when memory cache is updated (e.g. on new message)
+    _localDb.saveHistory(roomId, messages);
   }
 
   @override

@@ -12,61 +12,66 @@ class DashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        _buildAppBar(context),
-        SliverToBoxAdapter(
-          child: BlocBuilder<OwnerCubit, OwnerState>(
-            builder: (context, state) {
-              final owner = state.ownerDetails.fold(() => null, (u) => u);
-              final isVerified = owner?.verificationStatus?.toLowerCase() == "verified";
-
-              // Calculate active events and requests awaiting approval
-              final activeStatuses = ["Accepted", "Approved", "In Kitchen", "Dispatched", "Confirmed"];
-              final activeCount = state.bookings.where((b) => activeStatuses.contains(b.status)).length;
-              final pendingCount = state.bookings.where((b) => b.status == "Pending").length;
-
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!isVerified) ...[
-                      _buildVerificationBanner(),
-                      const SizedBox(height: 24),
-                    ],
-                    _buildWelcomeHeader(owner?.companyName ?? "CaterCraft"),
-                    const SizedBox(height: 32),
-                    _buildStatSection(activeCount, pendingCount),
-                    const SizedBox(height: 40),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Recent Bookings",
-                          style: GoogleFonts.outfit(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          child: Text("See All", style: TextStyle(color: AppTheme.ownerAccent.withOpacity(0.8))),
-                        ),
+    return RefreshIndicator(
+      onRefresh: () => context.read<OwnerCubit>().fetchBookings(),
+      color: AppTheme.ownerAccent,
+      backgroundColor: AppTheme.darkBackground,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          _buildAppBar(context),
+          SliverToBoxAdapter(
+            child: BlocBuilder<OwnerCubit, OwnerState>(
+              builder: (context, state) {
+                final owner = state.ownerDetails.fold(() => null, (u) => u);
+                final isVerified = owner?.verificationStatus?.toLowerCase() == "verified";
+  
+                // Calculate active events and requests awaiting approval
+                final activeStatuses = ["Accepted", "Approved", "In Kitchen", "Dispatched", "Confirmed"];
+                final activeCount = state.bookings.where((b) => activeStatuses.contains(b.status)).length;
+                final pendingCount = state.bookings.where((b) => b.status == "Pending").length;
+  
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (!isVerified) ...[
+                        _buildVerificationBanner(),
+                        const SizedBox(height: 24),
                       ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              );
-            },
+                      _buildWelcomeHeader(owner?.companyName ?? "CaterCraft"),
+                      const SizedBox(height: 32),
+                      _buildStatSection(activeCount, pendingCount),
+                      const SizedBox(height: 40),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Recent Bookings",
+                            style: GoogleFonts.outfit(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {},
+                            child: Text("See All", style: TextStyle(color: AppTheme.ownerAccent.withOpacity(0.8))),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-        _buildBookingsList(),
-        const SliverToBoxAdapter(child: SizedBox(height: 100)),
-      ],
+          _buildBookingsList(),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        ],
+      ),
     );
   }
 

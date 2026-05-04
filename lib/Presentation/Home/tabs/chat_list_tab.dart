@@ -24,129 +24,134 @@ class _ChatListTabState extends State<ChatListTab> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverAppBar(
-          expandedHeight: 0,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          leading: IconButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => const ProfileScreen()),
-            ),
-            icon: const Icon(
-              Icons.account_circle_outlined,
-              color: Colors.white70,
-              size: 28,
-            ),
-          ),
-          title: Text(
-            "COMMHUB",
-            style: GoogleFonts.outfit(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 4,
-            ),
-          ),
-          actions: [
-            IconButton(
+    return RefreshIndicator(
+      onRefresh: () => context.read<OwnerCubit>().fetchRecentConversations(),
+      color: AppTheme.ownerAccent,
+      backgroundColor: AppTheme.darkBackground,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 0,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            automaticallyImplyLeading: false,
+            leading: IconButton(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
               ),
               icon: const Icon(
-                Icons.notifications_none_rounded,
+                Icons.account_circle_outlined,
                 color: Colors.white70,
                 size: 28,
               ),
             ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Communications Hub",
-                  style: GoogleFonts.outfit(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Coordinate with your team in real-time",
-                  style: GoogleFonts.outfit(color: Colors.white54, fontSize: 14),
-                ),
-              ],
+            title: Text(
+              "COMMHUB",
+              style: GoogleFonts.outfit(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 4,
+              ),
             ),
+            actions: [
+              IconButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                ),
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Colors.white70,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
-        ),
-        BlocBuilder<OwnerCubit, OwnerState>(
-          builder: (context, state) {
-            if (state.isLoading && state.conversations.isEmpty) {
-              return const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator(color: AppTheme.ownerAccent)),
-              );
-            }
-
-            // final user = state.ownerDetails.fold(() => null, (u) => u);
-            // final myId = user?.id ?? '';
-            final recentConversations = state.conversations;
-
-            return SliverList(
-              delegate: SliverChildListDelegate([
-                if (recentConversations.isNotEmpty) ...[
-                  _sectionHeader("RECENT CHATS"),
-                  ...recentConversations.map((conv) {
-                    final isTyping = state.typingRooms[conv.roomId] ?? false;
-                    return _chatItem(
-                      context,
-                      name: conv.otherUserName,
-                      imageUrl: conv.otherUserImage,
-                      lastMessage: conv.lastMessage,
-                      time: _formatTime(conv.lastMessageTime),
-                      isOnline: conv.isOnline,
-                      unreadCount: conv.unreadCount,
-                      isTyping: isTyping,
-                      onTap: () {
-                        context.read<OwnerCubit>().markAsRead(conv.roomId);
-                        _navigateToChat(
-                          context,
-                          roomId: conv.roomId,
-                          name: conv.otherUserName,
-                          id: conv.otherUserId,
-                          type: conv.otherUserType,
-                        );
-                      },
-                    );
-                  }),
-                ],
-                if (recentConversations.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 100),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          const Icon(Icons.chat_bubble_outline_rounded, size: 64, color: Colors.white10),
-                          const SizedBox(height: 16),
-                          Text("No active conversations", style: GoogleFonts.outfit(color: Colors.white38)),
-                        ],
-                      ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Communications Hub",
+                    style: GoogleFonts.outfit(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                const SizedBox(height: 100), // Bottom padding for navbar
-              ]),
-            );
-          },
-        ),
-      ],
+                  const SizedBox(height: 8),
+                  Text(
+                    "Coordinate with your team in real-time",
+                    style: GoogleFonts.outfit(color: Colors.white54, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          BlocBuilder<OwnerCubit, OwnerState>(
+            builder: (context, state) {
+              if (state.isLoading && state.conversations.isEmpty) {
+                return const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator(color: AppTheme.ownerAccent)),
+                );
+              }
+  
+              // final user = state.ownerDetails.fold(() => null, (u) => u);
+              // final myId = user?.id ?? '';
+              final recentConversations = state.conversations;
+  
+              return SliverList(
+                delegate: SliverChildListDelegate([
+                  if (recentConversations.isNotEmpty) ...[
+                    _sectionHeader("RECENT CHATS"),
+                    ...recentConversations.map((conv) {
+                      final isTyping = state.typingRooms[conv.roomId] ?? false;
+                      return _chatItem(
+                        context,
+                        name: conv.otherUserName,
+                        imageUrl: conv.otherUserImage,
+                        lastMessage: conv.lastMessage,
+                        time: _formatTime(conv.lastMessageTime),
+                        isOnline: conv.isOnline,
+                        unreadCount: conv.unreadCount,
+                        isTyping: isTyping,
+                        onTap: () {
+                          context.read<OwnerCubit>().markAsRead(conv.roomId);
+                          _navigateToChat(
+                            context,
+                            roomId: conv.roomId,
+                            name: conv.otherUserName,
+                            id: conv.otherUserId,
+                            type: conv.otherUserType,
+                          );
+                        },
+                      );
+                    }),
+                  ],
+                  if (recentConversations.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 100),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            const Icon(Icons.chat_bubble_outline_rounded, size: 64, color: Colors.white10),
+                            const SizedBox(height: 16),
+                            Text("No active conversations", style: GoogleFonts.outfit(color: Colors.white38)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 100), // Bottom padding for navbar
+                ]),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 

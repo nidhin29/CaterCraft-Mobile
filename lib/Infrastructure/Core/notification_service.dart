@@ -162,9 +162,17 @@ class NotificationService {
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
+    final data = message.data;
+    
+    // 💡 SUPPRESS ALL FOREGROUND NOTIFICATIONS FOR CHAT
+    // The user wants silent updates (badges/list updates) without the popup when app is open
+    if (data['type'] == 'chat') {
+      debugPrint('🚫 Suppressing in-app notification popup for chat message.');
+      return;
+    }
+
     String? title = message.notification?.title;
     String? body = message.notification?.body;
-    final data = message.data;
 
     // IF E2EE DATA MESSAGE
     if (data['isEncrypted'] == 'true' || data['encryptedBody'] != null) {

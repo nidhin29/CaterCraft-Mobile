@@ -90,8 +90,9 @@ class SecurityService {
     final sharedSecret = await _deriveSharedSecret(senderPublicKey);
 
     final combined = base64.decode(ciphertextBase64);
-    if (combined.length < 16)
+    if (combined.length < 16) {
       throw Exception("Invalid ciphertext: too short for MAC");
+    }
 
     final macBytes = combined.sublist(combined.length - 16);
     final cipherTextOnly = combined.sublist(0, combined.length - 16);
@@ -141,8 +142,9 @@ class SecurityService {
   }) async {
     final sharedSecret = await _deriveSharedSecret(senderPublicKey);
 
-    if (encryptedBytes.length < 16)
+    if (encryptedBytes.length < 16) {
       throw Exception("Invalid encrypted bytes: too short for MAC");
+    }
 
     final macBytes = encryptedBytes.sublist(encryptedBytes.length - 16);
     final cipherTextOnly = encryptedBytes.sublist(

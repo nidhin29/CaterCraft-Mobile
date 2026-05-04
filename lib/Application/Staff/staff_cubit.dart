@@ -8,12 +8,13 @@ import 'package:catering/Infrastructure/Core/notification_service.dart';
 import 'package:catering/Domain/Failure/failure.dart';
 import 'package:dartz/dartz.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:catering/Domain/SignIn/sign_in_model/user_model.dart';
 import 'package:injectable/injectable.dart';
 
 part 'staff_state.dart';
 part 'staff_cubit.freezed.dart';
 
-@injectable
+@lazySingleton
 class StaffCubit extends Cubit<StaffState> {
   final BookingService _bookingService;
   final OwnerService _ownerService;
@@ -67,7 +68,7 @@ class StaffCubit extends Cubit<StaffState> {
     result.fold(
       (failure) => emit(state.copyWith(isLoading: false)),
       (user) {
-        emit(state.copyWith(isLoading: false));
+        emit(state.copyWith(isLoading: false, userDetails: some(user)));
         syncFCMToken();
       },
     );

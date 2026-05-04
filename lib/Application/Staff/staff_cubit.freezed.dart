@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$StaffState {
 
- List<BookingModel> get bookings; bool get isLoading; Option<Either<MainFailure, List<BookingModel>>> get failureOrSuccess; Map<String, List<String>> get completedTasks;
+ List<BookingModel> get bookings; bool get isLoading; Option<Either<MainFailure, List<BookingModel>>> get failureOrSuccess; Map<String, List<String>> get completedTasks;// bookingId -> list of completed task names
+ Option<UserModel> get userDetails;
 /// Create a copy of StaffState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -26,16 +27,16 @@ $StaffStateCopyWith<StaffState> get copyWith => _$StaffStateCopyWithImpl<StaffSt
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is StaffState&&const DeepCollectionEquality().equals(other.bookings, bookings)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.failureOrSuccess, failureOrSuccess) || other.failureOrSuccess == failureOrSuccess)&&const DeepCollectionEquality().equals(other.completedTasks, completedTasks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is StaffState&&const DeepCollectionEquality().equals(other.bookings, bookings)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.failureOrSuccess, failureOrSuccess) || other.failureOrSuccess == failureOrSuccess)&&const DeepCollectionEquality().equals(other.completedTasks, completedTasks)&&(identical(other.userDetails, userDetails) || other.userDetails == userDetails));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(bookings),isLoading,failureOrSuccess,const DeepCollectionEquality().hash(completedTasks));
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(bookings),isLoading,failureOrSuccess,const DeepCollectionEquality().hash(completedTasks),userDetails);
 
 @override
 String toString() {
-  return 'StaffState(bookings: $bookings, isLoading: $isLoading, failureOrSuccess: $failureOrSuccess, completedTasks: $completedTasks)';
+  return 'StaffState(bookings: $bookings, isLoading: $isLoading, failureOrSuccess: $failureOrSuccess, completedTasks: $completedTasks, userDetails: $userDetails)';
 }
 
 
@@ -46,7 +47,7 @@ abstract mixin class $StaffStateCopyWith<$Res>  {
   factory $StaffStateCopyWith(StaffState value, $Res Function(StaffState) _then) = _$StaffStateCopyWithImpl;
 @useResult
 $Res call({
- List<BookingModel> bookings, bool isLoading, Option<Either<MainFailure, List<BookingModel>>> failureOrSuccess, Map<String, List<String>> completedTasks
+ List<BookingModel> bookings, bool isLoading, Option<Either<MainFailure, List<BookingModel>>> failureOrSuccess, Map<String, List<String>> completedTasks, Option<UserModel> userDetails
 });
 
 
@@ -63,13 +64,14 @@ class _$StaffStateCopyWithImpl<$Res>
 
 /// Create a copy of StaffState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? bookings = null,Object? isLoading = null,Object? failureOrSuccess = null,Object? completedTasks = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? bookings = null,Object? isLoading = null,Object? failureOrSuccess = null,Object? completedTasks = null,Object? userDetails = null,}) {
   return _then(_self.copyWith(
 bookings: null == bookings ? _self.bookings : bookings // ignore: cast_nullable_to_non_nullable
 as List<BookingModel>,isLoading: null == isLoading ? _self.isLoading : isLoading // ignore: cast_nullable_to_non_nullable
 as bool,failureOrSuccess: null == failureOrSuccess ? _self.failureOrSuccess : failureOrSuccess // ignore: cast_nullable_to_non_nullable
 as Option<Either<MainFailure, List<BookingModel>>>,completedTasks: null == completedTasks ? _self.completedTasks : completedTasks // ignore: cast_nullable_to_non_nullable
-as Map<String, List<String>>,
+as Map<String, List<String>>,userDetails: null == userDetails ? _self.userDetails : userDetails // ignore: cast_nullable_to_non_nullable
+as Option<UserModel>,
   ));
 }
 
@@ -80,7 +82,7 @@ as Map<String, List<String>>,
 
 
 class _StaffState implements StaffState {
-  const _StaffState({required final  List<BookingModel> bookings, required this.isLoading, required this.failureOrSuccess, required final  Map<String, List<String>> completedTasks}): _bookings = bookings,_completedTasks = completedTasks;
+  const _StaffState({required final  List<BookingModel> bookings, required this.isLoading, required this.failureOrSuccess, required final  Map<String, List<String>> completedTasks, required this.userDetails}): _bookings = bookings,_completedTasks = completedTasks;
   
 
  final  List<BookingModel> _bookings;
@@ -99,6 +101,8 @@ class _StaffState implements StaffState {
   return EqualUnmodifiableMapView(_completedTasks);
 }
 
+// bookingId -> list of completed task names
+@override final  Option<UserModel> userDetails;
 
 /// Create a copy of StaffState
 /// with the given fields replaced by the non-null parameter values.
@@ -110,16 +114,16 @@ _$StaffStateCopyWith<_StaffState> get copyWith => __$StaffStateCopyWithImpl<_Sta
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _StaffState&&const DeepCollectionEquality().equals(other._bookings, _bookings)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.failureOrSuccess, failureOrSuccess) || other.failureOrSuccess == failureOrSuccess)&&const DeepCollectionEquality().equals(other._completedTasks, _completedTasks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _StaffState&&const DeepCollectionEquality().equals(other._bookings, _bookings)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.failureOrSuccess, failureOrSuccess) || other.failureOrSuccess == failureOrSuccess)&&const DeepCollectionEquality().equals(other._completedTasks, _completedTasks)&&(identical(other.userDetails, userDetails) || other.userDetails == userDetails));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_bookings),isLoading,failureOrSuccess,const DeepCollectionEquality().hash(_completedTasks));
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_bookings),isLoading,failureOrSuccess,const DeepCollectionEquality().hash(_completedTasks),userDetails);
 
 @override
 String toString() {
-  return 'StaffState(bookings: $bookings, isLoading: $isLoading, failureOrSuccess: $failureOrSuccess, completedTasks: $completedTasks)';
+  return 'StaffState(bookings: $bookings, isLoading: $isLoading, failureOrSuccess: $failureOrSuccess, completedTasks: $completedTasks, userDetails: $userDetails)';
 }
 
 
@@ -130,7 +134,7 @@ abstract mixin class _$StaffStateCopyWith<$Res> implements $StaffStateCopyWith<$
   factory _$StaffStateCopyWith(_StaffState value, $Res Function(_StaffState) _then) = __$StaffStateCopyWithImpl;
 @override @useResult
 $Res call({
- List<BookingModel> bookings, bool isLoading, Option<Either<MainFailure, List<BookingModel>>> failureOrSuccess, Map<String, List<String>> completedTasks
+ List<BookingModel> bookings, bool isLoading, Option<Either<MainFailure, List<BookingModel>>> failureOrSuccess, Map<String, List<String>> completedTasks, Option<UserModel> userDetails
 });
 
 
@@ -147,13 +151,14 @@ class __$StaffStateCopyWithImpl<$Res>
 
 /// Create a copy of StaffState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? bookings = null,Object? isLoading = null,Object? failureOrSuccess = null,Object? completedTasks = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? bookings = null,Object? isLoading = null,Object? failureOrSuccess = null,Object? completedTasks = null,Object? userDetails = null,}) {
   return _then(_StaffState(
 bookings: null == bookings ? _self._bookings : bookings // ignore: cast_nullable_to_non_nullable
 as List<BookingModel>,isLoading: null == isLoading ? _self.isLoading : isLoading // ignore: cast_nullable_to_non_nullable
 as bool,failureOrSuccess: null == failureOrSuccess ? _self.failureOrSuccess : failureOrSuccess // ignore: cast_nullable_to_non_nullable
 as Option<Either<MainFailure, List<BookingModel>>>,completedTasks: null == completedTasks ? _self._completedTasks : completedTasks // ignore: cast_nullable_to_non_nullable
-as Map<String, List<String>>,
+as Map<String, List<String>>,userDetails: null == userDetails ? _self.userDetails : userDetails // ignore: cast_nullable_to_non_nullable
+as Option<UserModel>,
   ));
 }
 

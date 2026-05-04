@@ -20,6 +20,16 @@ class ChatCubit extends Cubit<ChatState> {
     _socketService.listenForMessages(_onMessageReceived);
     _socketService.listenForTypingStatus(_onTypingStatusReceived);
     _socketService.listenForMessageDeletion(_onMessageDeleted);
+    
+    // Auto-rejoin room if socket reconnects
+    _socketService.socket.on('connect', _onSocketReconnect);
+  }
+
+  void _onSocketReconnect(dynamic _) {
+    if (!isClosed && _currentRoomId != null) {
+      log('🔄 Socket re-connected, re-joining chat room: $_currentRoomId');
+      _socketService.joinChat(_currentRoomId!);
+    }
   }
 
   void _onTypingStatusReceived(String room, String userId, bool isTyping) {
@@ -38,16 +48,24 @@ class ChatCubit extends Cubit<ChatState> {
       try {
         var newMessage = MessageModel.fromJson(data as Map<String, dynamic>);
         
+        // ONLY PROCESS IF FOR THIS ROOM
+        if (newMessage.room != _currentRoomId) {
+          log('📩 Received message for different room (${newMessage.room}), ignoring.');
+          return;
+        }
+
         // DECRYPT IF NEEDED
         if (newMessage.isEncrypted && newMessage.encryptionNonce != null) {
           final otherPubKey = state.recipientPublicKey;
           if (otherPubKey != null) {
             try {
+              if (isClosed) return;
               final decryptedText = await _securityService.decryptText(
                 ciphertextBase64: newMessage.message,
                 nonceBase64: newMessage.encryptionNonce!,
                 senderPublicKey: otherPubKey,
               );
+              if (isClosed) return;
               newMessage = newMessage.copyWith(message: decryptedText);
               log('🔓 E2EE: Decryption successful for message ${newMessage.id}');
             } catch (e) {
@@ -60,16 +78,37 @@ class ChatCubit extends Cubit<ChatState> {
           }
         }
 
-        // Prevent double messages
-        final isDuplicate = state.messages.any((m) => 
-          (m.id != null && m.id == newMessage.id) || 
-          (m.message == newMessage.message && m.senderId == newMessage.senderId && m.room == newMessage.room)
-        );
+        // Improved Duplicate Check
+        final isDuplicate = state.messages.any((m) {
+          // 1. If both have IDs, they must have the same ID to be a duplicate
+          if (m.id != null && newMessage.id != null) {
+            return m.id == newMessage.id;
+          }
+          // 2. If the existing message is a local "temp" message (no ID), 
+          // check if it matches the incoming socket message to prevent "echo" bubbles for the sender.
+          if (m.id == null) {
+            return m.message == newMessage.message && 
+                   m.senderId == newMessage.senderId && 
+                   m.room == newMessage.room;
+          }
+          return false;
+        });
 
         if (!isDuplicate) {
+          log('✅ Adding new message to state: ${newMessage.id}');
           // INSERT AT START for reversed list
           final updatedMessages = List<MessageModel>.from(state.messages)..insert(0, newMessage);
           emit(state.copyWith(messages: updatedMessages));
+
+          // Update cache with the new message (maintain original order)
+          final currentCached = _chatService.getCachedMessages(newMessage.room) ?? [];
+          final updatedCache = [newMessage, ...currentCached];
+          _chatService.updateCachedMessages(newMessage.room, updatedCache);
+
+          // Mark as read on server since we are viewing it
+          _chatService.markAsRead(newMessage.room);
+        } else {
+          log('ℹ️ Message ${newMessage.id} is a duplicate, skipping.');
         }
       } catch (e) {
         log('Error parsing socket message in ChatCubit: $e');
@@ -109,10 +148,12 @@ class ChatCubit extends Cubit<ChatState> {
 
     if (recipientPubKey != null) {
       final bytes = await imageFile.readAsBytes();
+      if (isClosed) return;
       final encryptionResult = await _securityService.encryptBytes(
         bytes: bytes,
         recipientPublicKey: recipientPubKey,
       );
+      if (isClosed) return;
       
       // Save encrypted bytes to temp file for upload
       final tempDir = Directory.systemTemp;
@@ -158,18 +199,45 @@ class ChatCubit extends Cubit<ChatState> {
     );
   }
 
-  Future<void> fetchHistory(String roomId) async {
+  Future<void> fetchHistory(String roomId, {String? otherUserId}) async {
     _currentRoomId = roomId;
-    // RESET PAGINATION ON NEW ROOM
-    emit(state.copyWith(
-      isLoading: true, 
-      error: null, 
-      currentPage: 1, 
-      hasMore: true,
-      messages: [],
-    ));
     
+    // 1. Check Memory Cache First
+    var cached = _chatService.getCachedMessages(roomId);
+    
+    // 2. If memory is empty (restart), check Disk (Local DB)
+    if (cached == null || cached.isEmpty) {
+      await _chatService.preLoadFromDisk(roomId);
+      cached = _chatService.getCachedMessages(roomId);
+    }
+
+    if (cached != null && cached.isNotEmpty && !isClosed) {
+      log('⚡ INSTANT LOAD: Displaying ${cached.length} decrypted messages.');
+      emit(state.copyWith(
+        messages: cached.reversed.toList(),
+        isLoading: false, 
+        error: null,
+        currentPage: 1,
+        hasMore: true,
+      ));
+    } else if (!isClosed) {
+      emit(state.copyWith(isLoading: true, error: null, currentPage: 1, hasMore: true, messages: []));
+    }
+    
+    // 3. Ensure we have the public key if E2EE is expected
+    if (state.recipientPublicKey == null && otherUserId != null) {
+      log('ℹ️ E2EE: Fetching missing public key before history load...');
+      final keyResult = await _chatService.getRecipientPublicKey(otherUserId);
+      if (isClosed) return;
+      keyResult.fold(
+        (l) => log('⚠️ E2EE: Failed to fetch key for history decryption.'),
+        (pubKey) => emit(state.copyWith(recipientPublicKey: pubKey)),
+      );
+    }
+
+    // 4. Always fetch latest from server in the background
     final failOrSuccess = await _chatService.getChatHistory(roomId, page: 1);
+    if (isClosed) return;
     
     failOrSuccess.fold(
       (l) => emit(state.copyWith(isLoading: false, error: 'Failed to fetch history')),
@@ -188,6 +256,7 @@ class ChatCubit extends Cubit<ChatState> {
                   nonceBase64: msg.encryptionNonce!,
                   senderPublicKey: otherPubKey,
                 );
+                if (isClosed) return;
                 decryptedHistory.add(msg.copyWith(message: decryptedText));
               } catch (e) {
                 log('❌ E2EE History Decryption Error: $e');
@@ -201,6 +270,9 @@ class ChatCubit extends Cubit<ChatState> {
           log('ℹ️ E2EE: No recipient public key in state, showing history as is.');
           decryptedHistory = history;
         }
+
+        // Update the repository cache with the decrypted versions
+        _chatService.updateCachedMessages(roomId, decryptedHistory);
 
         // REVERSE to Newest First
         final reversedHistory = decryptedHistory.reversed.toList();
@@ -221,6 +293,7 @@ class ChatCubit extends Cubit<ChatState> {
     emit(state.copyWith(isLoadMoreLoading: true));
 
     final failOrSuccess = await _chatService.getChatHistory(_currentRoomId!, page: nextPage);
+    if (isClosed) return;
 
     failOrSuccess.fold(
       (l) => emit(state.copyWith(isLoadMoreLoading: false)),
@@ -241,6 +314,7 @@ class ChatCubit extends Cubit<ChatState> {
                     nonceBase64: msg.encryptionNonce!,
                     senderPublicKey: otherPubKey,
                   );
+                  if (isClosed) return;
                   decryptedNewHistory.add(msg.copyWith(message: decryptedText));
                 } catch (e) {
                   decryptedNewHistory.add(msg.copyWith(message: "[🔒 Encrypted Message]"));
@@ -271,9 +345,13 @@ class ChatCubit extends Cubit<ChatState> {
   void joinRoom(String roomId, String otherUserId) async {
     _currentRoomId = roomId;
     _socketService.joinChat(roomId);
+    
+    // MARK AS READ on server
+    _chatService.markAsRead(roomId);
 
     // FETCH PUBLIC KEY FOR E2EE
     final result = await _chatService.getRecipientPublicKey(otherUserId);
+    if (isClosed) return;
     result.fold(
       (l) => log('⚠️ E2EE: Could not fetch recipient public key. Encryption will be disabled for this chat.'),
       (pubKey) {
@@ -301,6 +379,7 @@ class ChatCubit extends Cubit<ChatState> {
         plainText: message,
         recipientPublicKey: recipientPubKey,
       );
+      if (isClosed) return;
       finalMessage = encryptionResult['ciphertext']!;
       nonce = encryptionResult['nonce'];
     } else {
@@ -340,6 +419,7 @@ class ChatCubit extends Cubit<ChatState> {
     if (_currentRoomId != null) {
       _socketService.leaveChat(_currentRoomId!);
     }
+    _socketService.socket.off('connect', _onSocketReconnect);
     _socketService.stopListeningForMessages(_onMessageReceived);
     _socketService.stopListeningForTyping(_onTypingStatusReceived);
     _socketService.stopListeningForMessageDeletion(_onMessageDeleted);

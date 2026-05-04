@@ -49,8 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _chatCubit = getIt<ChatCubit>();
-    _chatCubit.joinRoom(widget.roomId, widget.otherUserId);
-    _chatCubit.fetchHistory(widget.roomId);
+    _initializeChat();
 
     _scrollController.addListener(_onScroll);
     _msgController.addListener(_onTextChanged);
@@ -61,6 +60,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _myId = user.id ?? '';
       _myType = (user.role == 1) ? 'Owner' : 'Staff';
     }
+  }
+
+  void _initializeChat() async {
+    // Notify OwnerCubit that we are in this room
+    context.read<OwnerCubit>().setActiveRoom(widget.roomId);
+    
+    _chatCubit.joinRoom(widget.roomId, widget.otherUserId);
+    _chatCubit.fetchHistory(widget.roomId, otherUserId: widget.otherUserId);
   }
 
   void _onTextChanged() {
@@ -91,6 +98,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _msgController.removeListener(_onTextChanged);
     _msgController.dispose();
     _scrollController.dispose();
+    
+    // Notify OwnerCubit that we left the room
+    getIt<OwnerCubit>().setActiveRoom(null);
+    
     _chatCubit.close();
     super.dispose();
   }
@@ -127,10 +138,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               onPressed: () {
+                final user = context.read<OwnerCubit>().state.ownerDetails.fold(() => null, (u) => u);
+                if (user == null) {
+                  Navigator.pop(context);
+                  return;
+                }
+                final myId = user.id ?? '';
+                final myType = (user.role == 1) ? 'Owner' : 'Staff';
+
                 Navigator.pop(context);
                 _chatCubit.sendImageMessage(
-                  senderId: _myId,
-                  senderType: _myType,
+                  senderId: myId,
+                  senderType: myType,
                   receiverId: widget.otherUserId,
                   receiverType: widget.otherUserType,
                   room: widget.roomId,
@@ -183,18 +202,25 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendMessage() {
     final text = _msgController.text.trim();
-    if (text.isEmpty || _myId.isEmpty) return;
+    if (text.isEmpty) return;
+
+    final user = context.read<OwnerCubit>().state.ownerDetails.fold(() => null, (u) => u);
+    if (user == null) return;
+
+    final myId = user.id ?? '';
+    final myType = (user.role == 1) ? 'Owner' : 'Staff';
+
+    if (myId.isEmpty) return;
 
     _chatCubit.sendMessage(
-      senderId: _myId,
-      senderType: _myType,
+      senderId: myId,
+      senderType: myType,
       receiverId: widget.otherUserId,
       receiverType: widget.otherUserType,
       message: text,
       room: widget.roomId,
     );
     _msgController.clear();
-    // No delayed scroll needed for reverse list, index 0 is at bottom
   }
   @override
   Widget build(BuildContext context) {

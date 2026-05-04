@@ -17,8 +17,20 @@ class BookingRepo implements BookingService {
       final response = await _dio.get('api/v1/booking/User/view-bookings');
       log(response.data.toString());
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : (response.data['data'] as List? ?? []);
-        final bookings = data.map((json) => BookingModel.fromJson(json as Map<String, dynamic>)).toList();
+        final rawData = response.data;
+        List<dynamic> dataList = [];
+        
+        if (rawData is List) {
+          dataList = rawData;
+        } else if (rawData is Map && rawData['data'] is List) {
+          dataList = rawData['data'];
+        }
+
+        final bookings = dataList
+            .whereType<Map<String, dynamic>>()
+            .map((json) => BookingModel.fromJson(json))
+            .toList();
+            
         return Right(bookings);
       } else {
         return const Left(MainFailure.serverFailure());
@@ -54,8 +66,20 @@ class BookingRepo implements BookingService {
       final response = await _dio.get('api/v1/booking/staff-tasks');
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data is List ? response.data : (response.data['data'] as List? ?? []);
-        final tasks = data.map((json) => BookingModel.fromJson(json as Map<String, dynamic>)).toList();
+        final rawData = response.data;
+        List<dynamic> dataList = [];
+        
+        if (rawData is List) {
+          dataList = rawData;
+        } else if (rawData is Map && rawData['data'] is List) {
+          dataList = rawData['data'];
+        }
+        
+        final tasks = dataList
+            .whereType<Map<String, dynamic>>()
+            .map((json) => BookingModel.fromJson(json))
+            .toList();
+            
         return Right(tasks);
       } else {
         return const Left(MainFailure.serverFailure());

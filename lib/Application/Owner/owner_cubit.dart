@@ -23,7 +23,7 @@ import 'package:catering/Infrastructure/Core/notification_service.dart';
 part 'owner_state.dart';
 part 'owner_cubit.freezed.dart';
 
-@injectable
+@lazySingleton
 class OwnerCubit extends Cubit<OwnerState> {
   final BookingService _bookingService;
   final ServiceManagementService _serviceService;
@@ -66,62 +66,105 @@ class OwnerCubit extends Cubit<OwnerState> {
   }
 
   void _setupGlobalMessageListener() {
+    if (_messageListener != null) return;
     _messageListener = (data) async {
       if (isClosed) return;
       try {
         final newMessage = MessageModel.fromJson(data as Map<String, dynamic>);
+        
+        final myId = state.ownerDetails.fold(
+          () => _currentUserId ?? 'NO_ID', 
+          (u) => u.id ?? _currentUserId ?? 'NO_ID'
+        ).trim().toLowerCase();
+        
+        final senderId = newMessage.senderId.trim().toLowerCase();
+        final isOwnMessage = senderId == myId;
+        final isViewingRoom = state.activeRoomId != null && 
+                             state.activeRoomId!.trim() == newMessage.room.trim();
 
-        final myId = state.ownerDetails.fold(() => '', (u) => u.id ?? '');
+        log('🔢 ID CHECK: Me=$myId vs Sender=$senderId | isOwn=$isOwnMessage | isViewing=$isViewingRoom');
 
-        // Update the conversations list with the new message snippet and unread count
-        final updatedConversations = await Future.wait(
-          state.conversations.map((conv) async {
-            if (conv.roomId == newMessage.room) {
-              final isOwnMessage = newMessage.senderId == myId;
-              String displayMessage = newMessage.message;
-
-              if (newMessage.isEncrypted &&
-                  newMessage.encryptionNonce != null) {
-                final otherPubKey = conv.otherUserPublicKey;
-                if (otherPubKey != null) {
-                  try {
-                    displayMessage = await _securityService.decryptText(
-                      ciphertextBase64: newMessage.message,
-                      nonceBase64: newMessage.encryptionNonce!,
-                      senderPublicKey: otherPubKey,
-                    );
-                  } catch (e) {
-                    displayMessage = "[🔒 Encrypted Message]";
-                  }
-                }
+        // 1. Decrypt (Async)
+        String displayMessage = newMessage.message;
+        if (newMessage.isEncrypted && newMessage.encryptionNonce != null) {
+          final roomToMatch = newMessage.room.trim();
+          final convIndex = state.conversations.indexWhere((c) => c.roomId.trim() == roomToMatch);
+          if (convIndex != -1) {
+            final otherPubKey = state.conversations[convIndex].otherUserPublicKey;
+            if (otherPubKey != null) {
+              try {
+                displayMessage = await _securityService.decryptText(
+                  ciphertextBase64: newMessage.message,
+                  nonceBase64: newMessage.encryptionNonce!,
+                  senderPublicKey: otherPubKey,
+                );
+              } catch (e) {
+                displayMessage = "[🔒 Encrypted Message]";
               }
-
-              return conv.copyWith(
-                lastMessage: displayMessage,
-                lastMessageTime:
-                    newMessage.createdAt ?? DateTime.now().toIso8601String(),
-                unreadCount:
-                    isOwnMessage ? conv.unreadCount : conv.unreadCount + 1,
-              );
             }
-            return conv;
-          }),
-        );
+          }
+        }
 
-        // If it's a message from someone new, we might want to refresh the whole list
-        final roomExists = state.conversations.any(
-          (c) => c.roomId == newMessage.room,
-        );
-        if (!roomExists) {
+        // 2. Update state (Sync)
+        bool foundRoom = false;
+        final updatedConversations = state.conversations.map((conv) {
+          if (conv.roomId.trim() == newMessage.room.trim()) {
+            foundRoom = true;
+            
+            int newCount = conv.unreadCount;
+            if (isViewingRoom) {
+              newCount = 0;
+            } else if (!isOwnMessage) {
+              newCount = conv.unreadCount + 1;
+            }
+
+            return conv.copyWith(
+              lastMessage: displayMessage,
+              lastMessageTime: newMessage.createdAt ?? DateTime.now().toIso8601String(),
+              unreadCount: newCount,
+            );
+          }
+          return conv;
+        }).toList();
+
+        if (!foundRoom) {
+          log('🔢 UNREAD: New room found, fetching...');
           fetchRecentConversations();
         } else {
+          log('✅ UI UPDATE: Room ${newMessage.room} count updated.');
           emit(state.copyWith(conversations: updatedConversations));
         }
+
+        // 🔄 SYNC WITH CHAT REPO: Update the history cache so Chat Screen is ready instantly
+        final currentCached = _chatService.getCachedMessages(newMessage.room) ?? [];
+        // Check if message already exists to avoid duplicates
+        if (!currentCached.any((m) => m.id == newMessage.id)) {
+          final updatedCache = [newMessage.copyWith(message: displayMessage), ...currentCached];
+          _chatService.updateCachedMessages(newMessage.room, updatedCache);
+          log('💾 GLOBAL SYNC: Message saved to local storage from Inbox.');
+        }
+
       } catch (e) {
-        log('Error in Global Message Listener: $e');
+        log('❌ Error in Socket Listener: $e');
       }
     };
     _socketService.listenForMessages(_messageListener!);
+  }
+
+  void setActiveRoom(String? roomId) {
+    log('🚪 ACTIVE ROOM CHANGED TO: $roomId');
+    emit(state.copyWith(activeRoomId: roomId));
+    
+    // If we just entered a room, clear its unread count locally
+    if (roomId != null) {
+      final updatedConversations = state.conversations.map((c) {
+        if (c.roomId.trim() == roomId.trim()) {
+          return c.copyWith(unreadCount: 0);
+        }
+        return c;
+      }).toList();
+      emit(state.copyWith(conversations: updatedConversations));
+    }
   }
 
   StreamSubscription? _notificationSubscription;
@@ -240,11 +283,16 @@ class OwnerCubit extends Cubit<OwnerState> {
     );
   }
 
+  String? _currentUserId;
+
   void setupSocket(
     String email, [
     String? userId,
     Function(String)? onNewBooking,
   ]) {
+    _currentUserId = userId; // ALWAYS update this so unread logic knows who "ME" is
+    log('🔌 Socket Setup: UserID set to $_currentUserId');
+    
     if (_isSocketSetup) return;
     _isSocketSetup = true;
     _socketService.connect();
@@ -412,6 +460,9 @@ class OwnerCubit extends Cubit<OwnerState> {
           }
         }
         decryptedConvs.add(conv.copyWith(lastMessage: displayMessage));
+        
+        // 💬 JOIN EACH ROOM to listen for real-time updates while in Inbox
+        _socketService.joinChat(conv.roomId);
       }
 
       emit(state.copyWith(isLoading: false, conversations: decryptedConvs));

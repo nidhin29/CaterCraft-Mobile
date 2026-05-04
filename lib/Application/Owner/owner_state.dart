@@ -17,6 +17,7 @@ abstract class OwnerState with _$OwnerState {
     required Option<Either<MainFailure, UserModel>> updateProfileFailureOrSuccess,
     required Option<Either<MainFailure, Unit>> addStaffFailureOrSuccess,
     @Default({}) Map<String, bool> typingRooms,
+    String? activeRoomId,
   }) = _OwnerState;
 
   factory OwnerState.initial() => OwnerState(

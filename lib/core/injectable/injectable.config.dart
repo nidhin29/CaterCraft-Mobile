@@ -26,6 +26,7 @@ import 'package:catering/Domain/Service/service_management_service.dart'
 import 'package:catering/Domain/SignIn/sign_in_service.dart' as _i675;
 import 'package:catering/Domain/TokenManager/token_service.dart' as _i870;
 import 'package:catering/Infrastructure/booking/booking_repo.dart' as _i284;
+import 'package:catering/Infrastructure/Chat/chat_local_db.dart' as _i255;
 import 'package:catering/Infrastructure/Chat/chat_repo.dart' as _i686;
 import 'package:catering/Infrastructure/Core/injectable_module.dart' as _i873;
 import 'package:catering/Infrastructure/Core/socket_service.dart' as _i717;
@@ -56,19 +57,15 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i361.Dio>(() => networkModule.dio);
     gh.lazySingleton<_i165.SecurityService>(() => _i165.SecurityService());
     gh.lazySingleton<_i717.SocketService>(() => _i717.SocketService());
-    gh.lazySingleton<_i872.ChatService>(() => _i686.ChatRepo(gh<_i361.Dio>()));
+    gh.lazySingleton<_i255.ChatLocalDb>(() => _i255.ChatLocalDb());
     gh.lazySingleton<_i346.BookingService>(
       () => _i284.BookingRepo(gh<_i361.Dio>()),
     );
     gh.lazySingleton<_i870.TokenService>(
       () => _i623.TokenRepo(gh<_i460.SharedPreferences>()),
     );
-    gh.factory<_i344.ChatCubit>(
-      () => _i344.ChatCubit(
-        gh<_i872.ChatService>(),
-        gh<_i717.SocketService>(),
-        gh<_i165.SecurityService>(),
-      ),
+    gh.lazySingleton<_i872.ChatService>(
+      () => _i686.ChatRepo(gh<_i361.Dio>(), gh<_i255.ChatLocalDb>()),
     );
     gh.factory<_i767.BookingCubit>(
       () => _i767.BookingCubit(gh<_i346.BookingService>()),
@@ -94,7 +91,7 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i430.OwnerService>(
       () => _i699.OwnerRepo(gh<_i361.Dio>(), gh<_i870.TokenService>()),
     );
-    gh.factory<_i324.StaffCubit>(
+    gh.lazySingleton<_i324.StaffCubit>(
       () => _i324.StaffCubit(
         gh<_i346.BookingService>(),
         gh<_i430.OwnerService>(),
@@ -106,7 +103,14 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i712.LoggedInService>(),
       ),
     );
-    gh.factory<_i980.OwnerCubit>(
+    gh.factory<_i344.ChatCubit>(
+      () => _i344.ChatCubit(
+        gh<_i872.ChatService>(),
+        gh<_i717.SocketService>(),
+        gh<_i165.SecurityService>(),
+      ),
+    );
+    gh.lazySingleton<_i980.OwnerCubit>(
       () => _i980.OwnerCubit(
         gh<_i346.BookingService>(),
         gh<_i951.ServiceManagementService>(),
