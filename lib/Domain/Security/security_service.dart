@@ -28,7 +28,10 @@ class SecurityService {
     final privateKey = await keyPair.extract();
     final publicKey = await keyPair.extractPublicKey();
 
-    await _storage.write(key: _privateKeyName, value: base64.encode(privateKey.bytes));
+    await _storage.write(
+      key: _privateKeyName,
+      value: base64.encode(privateKey.bytes),
+    );
     return base64.encode(publicKey.bytes);
   }
 
@@ -37,7 +40,9 @@ class SecurityService {
     final privateKeyBase64 = await _storage.read(key: _privateKeyName);
     if (privateKeyBase64 == null) throw Exception("Secret key not initialized");
 
-    final ownKeyPair = await _algorithm.newKeyPairFromSeed(base64.decode(privateKeyBase64));
+    final ownKeyPair = await _algorithm.newKeyPairFromSeed(
+      base64.decode(privateKeyBase64),
+    );
     final otherPublicKey = SimplePublicKey(
       base64.decode(otherPublicKeyBase64),
       type: KeyPairType.x25519,
@@ -57,7 +62,7 @@ class SecurityService {
   }) async {
     final sharedSecret = await _deriveSharedSecret(recipientPublicKey);
     final nonce = _cipher.newNonce();
-    
+
     final secretBox = await _cipher.encrypt(
       utf8.encode(plainText),
       secretKey: sharedSecret,
@@ -65,7 +70,10 @@ class SecurityService {
     );
 
     // CONCATENATE CipherText + MAC for integrity
-    final combined = Uint8List.fromList([...secretBox.cipherText, ...secretBox.mac.bytes]);
+    final combined = Uint8List.fromList([
+      ...secretBox.cipherText,
+      ...secretBox.mac.bytes,
+    ]);
 
     return {
       'ciphertext': base64.encode(combined),
@@ -80,13 +88,14 @@ class SecurityService {
     required String senderPublicKey,
   }) async {
     final sharedSecret = await _deriveSharedSecret(senderPublicKey);
-    
+
     final combined = base64.decode(ciphertextBase64);
-    if (combined.length < 16) throw Exception("Invalid ciphertext: too short for MAC");
+    if (combined.length < 16)
+      throw Exception("Invalid ciphertext: too short for MAC");
 
     final macBytes = combined.sublist(combined.length - 16);
     final cipherTextOnly = combined.sublist(0, combined.length - 16);
-    
+
     final secretBox = SecretBox(
       cipherTextOnly,
       nonce: base64.decode(nonceBase64),
@@ -116,12 +125,12 @@ class SecurityService {
     );
 
     // CONCATENATE CipherText + MAC
-    final combined = Uint8List.fromList([...secretBox.cipherText, ...secretBox.mac.bytes]);
+    final combined = Uint8List.fromList([
+      ...secretBox.cipherText,
+      ...secretBox.mac.bytes,
+    ]);
 
-    return {
-      'ciphertext': combined,
-      'nonce': base64.encode(secretBox.nonce),
-    };
+    return {'ciphertext': combined, 'nonce': base64.encode(secretBox.nonce)};
   }
 
   /// Decrypts raw bytes.
@@ -132,10 +141,14 @@ class SecurityService {
   }) async {
     final sharedSecret = await _deriveSharedSecret(senderPublicKey);
 
-    if (encryptedBytes.length < 16) throw Exception("Invalid encrypted bytes: too short for MAC");
+    if (encryptedBytes.length < 16)
+      throw Exception("Invalid encrypted bytes: too short for MAC");
 
     final macBytes = encryptedBytes.sublist(encryptedBytes.length - 16);
-    final cipherTextOnly = encryptedBytes.sublist(0, encryptedBytes.length - 16);
+    final cipherTextOnly = encryptedBytes.sublist(
+      0,
+      encryptedBytes.length - 16,
+    );
 
     final secretBox = SecretBox(
       cipherTextOnly,

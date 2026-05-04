@@ -82,6 +82,7 @@ class SplashScreenState extends State<SplashScreen>
                   Container(
                     width: 150,
                     height: 150,
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.05),
                       shape: BoxShape.circle,
@@ -94,10 +95,9 @@ class SplashScreenState extends State<SplashScreen>
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(24),
                     child: Image.asset(
                       'assets/images/logo.png',
-                      fit: BoxFit.contain,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   const SizedBox(height: 32),

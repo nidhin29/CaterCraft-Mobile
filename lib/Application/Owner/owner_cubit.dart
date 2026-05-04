@@ -74,37 +74,44 @@ class OwnerCubit extends Cubit<OwnerState> {
         final myId = state.ownerDetails.fold(() => '', (u) => u.id ?? '');
 
         // Update the conversations list with the new message snippet and unread count
-        final updatedConversations = await Future.wait(state.conversations.map((conv) async {
-          if (conv.roomId == newMessage.room) {
-            final isOwnMessage = newMessage.senderId == myId;
-            String displayMessage = newMessage.message;
+        final updatedConversations = await Future.wait(
+          state.conversations.map((conv) async {
+            if (conv.roomId == newMessage.room) {
+              final isOwnMessage = newMessage.senderId == myId;
+              String displayMessage = newMessage.message;
 
-            if (newMessage.isEncrypted && newMessage.encryptionNonce != null) {
-              final otherPubKey = conv.otherUserPublicKey;
-              if (otherPubKey != null) {
-                try {
-                  displayMessage = await _securityService.decryptText(
-                    ciphertextBase64: newMessage.message,
-                    nonceBase64: newMessage.encryptionNonce!,
-                    senderPublicKey: otherPubKey,
-                  );
-                } catch (e) {
-                  displayMessage = "[🔒 Encrypted Message]";
+              if (newMessage.isEncrypted &&
+                  newMessage.encryptionNonce != null) {
+                final otherPubKey = conv.otherUserPublicKey;
+                if (otherPubKey != null) {
+                  try {
+                    displayMessage = await _securityService.decryptText(
+                      ciphertextBase64: newMessage.message,
+                      nonceBase64: newMessage.encryptionNonce!,
+                      senderPublicKey: otherPubKey,
+                    );
+                  } catch (e) {
+                    displayMessage = "[🔒 Encrypted Message]";
+                  }
                 }
               }
-            }
 
-            return conv.copyWith(
-              lastMessage: displayMessage,
-              lastMessageTime: newMessage.createdAt ?? DateTime.now().toIso8601String(),
-              unreadCount: isOwnMessage ? conv.unreadCount : conv.unreadCount + 1,
-            );
-          }
-          return conv;
-        }));
+              return conv.copyWith(
+                lastMessage: displayMessage,
+                lastMessageTime:
+                    newMessage.createdAt ?? DateTime.now().toIso8601String(),
+                unreadCount:
+                    isOwnMessage ? conv.unreadCount : conv.unreadCount + 1,
+              );
+            }
+            return conv;
+          }),
+        );
 
         // If it's a message from someone new, we might want to refresh the whole list
-        final roomExists = state.conversations.any((c) => c.roomId == newMessage.room);
+        final roomExists = state.conversations.any(
+          (c) => c.roomId == newMessage.room,
+        );
         if (!roomExists) {
           fetchRecentConversations();
         } else {
@@ -120,23 +127,28 @@ class OwnerCubit extends Cubit<OwnerState> {
   StreamSubscription? _notificationSubscription;
 
   void _setupNotificationListener() {
-    _notificationSubscription = NotificationService().onNotificationReceived.listen((data) {
-      if (isClosed) return;
-      
-      if (data.containsKey('model')) {
-        final newNotif = NotificationModel.fromJson(data['model'] as Map<String, dynamic>);
-        final updated = [newNotif, ...state.notifications];
-        emit(state.copyWith(notifications: updated));
-      }
+    _notificationSubscription = NotificationService().onNotificationReceived
+        .listen((data) {
+          if (isClosed) return;
 
-      final type = data['type'];
-      log("🔔 OwnerCubit received notification event: $type");
-      
-      // Refresh logic based on trigger type
-      if (type == "booking" || type == "payment_received" || type == "new_booking") {
-        fetchBookings();
-      }
-    });
+          if (data.containsKey('model')) {
+            final newNotif = NotificationModel.fromJson(
+              data['model'] as Map<String, dynamic>,
+            );
+            final updated = [newNotif, ...state.notifications];
+            emit(state.copyWith(notifications: updated));
+          }
+
+          final type = data['type'];
+          log("🔔 OwnerCubit received notification event: $type");
+
+          // Refresh logic based on trigger type
+          if (type == "booking" ||
+              type == "payment_received" ||
+              type == "new_booking") {
+            fetchBookings();
+          }
+        });
   }
 
   Future<void> _loadNotifications() async {
@@ -147,22 +159,26 @@ class OwnerCubit extends Cubit<OwnerState> {
   Future<void> fetchBookings() async {
     emit(state.copyWith(isLoading: true, bookingFailureOrSuccess: none()));
     final result = await _bookingService.getBookings();
-    emit(state.copyWith(
-      isLoading: false,
-      bookingFailureOrSuccess: some(result),
-      bookings: result.getOrElse(() => []),
-    ));
+    emit(
+      state.copyWith(
+        isLoading: false,
+        bookingFailureOrSuccess: some(result),
+        bookings: result.getOrElse(() => []),
+      ),
+    );
   }
 
   Future<void> updateBookingStatus(String bookingId, String newStatus) async {
     emit(state.copyWith(isLoading: true, bookingFailureOrSuccess: none()));
     final result = await _bookingService.updateStatus(bookingId, newStatus);
-    
+
     result.fold(
-      (failure) => emit(state.copyWith(
-        isLoading: false,
-        bookingFailureOrSuccess: some(left(failure)),
-      )),
+      (failure) => emit(
+        state.copyWith(
+          isLoading: false,
+          bookingFailureOrSuccess: some(left(failure)),
+        ),
+      ),
       (_) {
         emit(state.copyWith(isLoading: false));
         fetchBookings(); // Refresh list to reflect changes
@@ -170,13 +186,18 @@ class OwnerCubit extends Cubit<OwnerState> {
     );
   }
 
-  Future<void> assignStaffToBooking(String bookingId, List<String> staffIds) async {
+  Future<void> assignStaffToBooking(
+    String bookingId,
+    List<String> staffIds,
+  ) async {
     emit(state.copyWith(isLoading: true, assignStaffFailureOrSuccess: none()));
     final result = await _bookingService.assignStaff(bookingId, staffIds);
-    emit(state.copyWith(
-      isLoading: false,
-      assignStaffFailureOrSuccess: some(result),
-    ));
+    emit(
+      state.copyWith(
+        isLoading: false,
+        assignStaffFailureOrSuccess: some(result),
+      ),
+    );
     if (result.isRight()) {
       fetchBookings(); // Refresh list to show updated assignments
     }
@@ -211,13 +232,19 @@ class OwnerCubit extends Cubit<OwnerState> {
       desserts: desserts,
       whatsIncluded: whatsIncluded,
     );
-    emit(state.copyWith(
-      isSubmitting: false,
-      serviceFailureOrSuccess: some(result),
-    ));
+    emit(
+      state.copyWith(
+        isSubmitting: false,
+        serviceFailureOrSuccess: some(result),
+      ),
+    );
   }
 
-  void setupSocket(String email, [String? userId, Function(String)? onNewBooking]) {
+  void setupSocket(
+    String email, [
+    String? userId,
+    Function(String)? onNewBooking,
+  ]) {
     if (_isSocketSetup) return;
     _isSocketSetup = true;
     _socketService.connect();
@@ -241,10 +268,9 @@ class OwnerCubit extends Cubit<OwnerState> {
   Future<void> fetchServices() async {
     emit(state.copyWith(isLoading: true));
     final result = await _serviceService.viewServices();
-    emit(state.copyWith(
-      isLoading: false,
-      services: result.getOrElse(() => []),
-    ));
+    emit(
+      state.copyWith(isLoading: false, services: result.getOrElse(() => [])),
+    );
   }
 
   void clearServiceStatus() {
@@ -254,32 +280,25 @@ class OwnerCubit extends Cubit<OwnerState> {
   Future<void> fetchStaff() async {
     emit(state.copyWith(isLoading: true, addStaffFailureOrSuccess: none()));
     final result = await _ownerService.viewStaff();
-    emit(state.copyWith(
-      isLoading: false,
-      staffList: result.getOrElse(() => []),
-    ));
+    emit(
+      state.copyWith(isLoading: false, staffList: result.getOrElse(() => [])),
+    );
   }
 
   Future<void> fetchDetails() async {
     emit(state.copyWith(isLoading: true));
     final result = await _ownerService.getDetails();
-    result.fold(
-      (failure) => null,
-      (user) {
-        emit(state.copyWith(
-          isLoading: false,
-          ownerDetails: some(user),
-        ));
-        _syncE2EEKeys();
-        syncFCMToken(); // Auto-sync notification token on every profile refresh
-      },
-    );
+    result.fold((failure) => null, (user) {
+      emit(state.copyWith(isLoading: false, ownerDetails: some(user)));
+      _syncE2EEKeys();
+      syncFCMToken(); // Auto-sync notification token on every profile refresh
+    });
   }
 
   Future<void> _syncE2EEKeys() async {
     try {
       final publicKey = await _securityService.getOrGenerateKeys();
-      
+
       // Check if server already has this key to avoid redundant updates
       final currentDetails = state.ownerDetails.fold(() => null, (u) => u);
       if (currentDetails != null && currentDetails.chatPublicKey == publicKey) {
@@ -298,7 +317,9 @@ class OwnerCubit extends Cubit<OwnerState> {
     String? fullName,
     File? profileImage,
   }) async {
-    emit(state.copyWith(isSubmitting: true, updateProfileFailureOrSuccess: none()));
+    emit(
+      state.copyWith(isSubmitting: true, updateProfileFailureOrSuccess: none()),
+    );
     final result = await _ownerService.updateProfile(
       companyName: companyName,
       logo: logo,
@@ -306,15 +327,19 @@ class OwnerCubit extends Cubit<OwnerState> {
       profileImage: profileImage,
     );
     result.fold(
-      (failure) => emit(state.copyWith(
-        isSubmitting: false,
-        updateProfileFailureOrSuccess: some(left(failure)),
-      )),
-      (user) => emit(state.copyWith(
-        isSubmitting: false,
-        ownerDetails: some(user),
-        updateProfileFailureOrSuccess: some(right(user)),
-      )),
+      (failure) => emit(
+        state.copyWith(
+          isSubmitting: false,
+          updateProfileFailureOrSuccess: some(left(failure)),
+        ),
+      ),
+      (user) => emit(
+        state.copyWith(
+          isSubmitting: false,
+          ownerDetails: some(user),
+          updateProfileFailureOrSuccess: some(right(user)),
+        ),
+      ),
     );
   }
 
@@ -333,10 +358,12 @@ class OwnerCubit extends Cubit<OwnerState> {
       designation: designation,
       fcmToken: fcmToken,
     );
-    emit(state.copyWith(
-      isSubmitting: false,
-      addStaffFailureOrSuccess: some(result),
-    ));
+    emit(
+      state.copyWith(
+        isSubmitting: false,
+        addStaffFailureOrSuccess: some(result),
+      ),
+    );
     if (result.isRight()) {
       fetchStaff(); // Refresh list after adding
     }
@@ -346,47 +373,49 @@ class OwnerCubit extends Cubit<OwnerState> {
     emit(state.copyWith(addStaffFailureOrSuccess: none()));
   }
 
-
-  Future<Either<MainFailure, Unit>> updatePassword({required String oldPassword, required String newPassword}) async {
+  Future<Either<MainFailure, Unit>> updatePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
     emit(state.copyWith(isSubmitting: true));
-    final result = await _ownerService.updatePassword(oldPassword: oldPassword, newPassword: newPassword);
+    final result = await _ownerService.updatePassword(
+      oldPassword: oldPassword,
+      newPassword: newPassword,
+    );
     emit(state.copyWith(isSubmitting: false));
     return result;
   }
 
-
   Future<void> fetchRecentConversations() async {
     emit(state.copyWith(isLoading: true));
     final result = await _chatService.getRecentChats();
-    
-    result.fold(
-      (failure) => emit(state.copyWith(isLoading: false)),
-      (conversations) async {
-        List<ConversationModel> decryptedConvs = [];
-        
-        for (var conv in conversations) {
-          String displayMessage = conv.lastMessage;
-          if (conv.isEncrypted && conv.encryptionNonce != null && conv.otherUserPublicKey != null) {
-            try {
-              displayMessage = await _securityService.decryptText(
-                ciphertextBase64: conv.lastMessage,
-                nonceBase64: conv.encryptionNonce!,
-                senderPublicKey: conv.otherUserPublicKey!,
-              );
-            } catch (e) {
-              log('❌ E2EE Inbox Decryption Error: $e');
-              displayMessage = "[🔒 Encrypted Message]";
-            }
-          }
-          decryptedConvs.add(conv.copyWith(lastMessage: displayMessage));
-        }
 
-        emit(state.copyWith(
-          isLoading: false,
-          conversations: decryptedConvs,
-        ));
-      },
-    );
+    result.fold((failure) => emit(state.copyWith(isLoading: false)), (
+      conversations,
+    ) async {
+      List<ConversationModel> decryptedConvs = [];
+
+      for (var conv in conversations) {
+        String displayMessage = conv.lastMessage;
+        if (conv.isEncrypted &&
+            conv.encryptionNonce != null &&
+            conv.otherUserPublicKey != null) {
+          try {
+            displayMessage = await _securityService.decryptText(
+              ciphertextBase64: conv.lastMessage,
+              nonceBase64: conv.encryptionNonce!,
+              senderPublicKey: conv.otherUserPublicKey!,
+            );
+          } catch (e) {
+            log('❌ E2EE Inbox Decryption Error: $e');
+            displayMessage = "[🔒 Encrypted Message]";
+          }
+        }
+        decryptedConvs.add(conv.copyWith(lastMessage: displayMessage));
+      }
+
+      emit(state.copyWith(isLoading: false, conversations: decryptedConvs));
+    });
   }
 
   Future<void> syncFCMToken() async {
@@ -402,12 +431,13 @@ class OwnerCubit extends Cubit<OwnerState> {
 
   Future<void> markAsRead(String roomId) async {
     // Optimistic update
-    final updatedConversations = state.conversations.map((conv) {
-      if (conv.roomId == roomId) {
-        return conv.copyWith(unreadCount: 0);
-      }
-      return conv;
-    }).toList();
+    final updatedConversations =
+        state.conversations.map((conv) {
+          if (conv.roomId == roomId) {
+            return conv.copyWith(unreadCount: 0);
+          }
+          return conv;
+        }).toList();
     emit(state.copyWith(conversations: updatedConversations));
 
     // Backend call
