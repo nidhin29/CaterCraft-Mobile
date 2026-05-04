@@ -31,6 +31,10 @@ class _RegisterPageState extends State<RegisterPage> {
       final googleSignIn = GoogleSignIn(
         serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
       );
+
+      // Clear previous sign-in to force account selection
+      await googleSignIn.signOut();
+
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) return;
 

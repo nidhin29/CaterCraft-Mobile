@@ -30,14 +30,17 @@ abstract class NetworkModule {
           
           if (refreshToken != null) {
             try {
+              final role = await tokenService.getRole() ?? 1;
+              final String base = role == 1 ? 'owner' : 'staff';
+              
               // Create a dedicated Dio instance for refresh to avoid circular dependency
               final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
               final response = await refreshDio.post(
-                'api/v1/auth/refresh-token',
+                'api/v1/$base/refresh-token',
                 data: {'refreshToken': refreshToken},
               );
 
-              if (response.statusCode == 200) {
+              if (response.statusCode == 200 || response.statusCode == 201) {
                 final newAccessToken = response.data['data']['accessToken'];
                 final newRefreshToken = response.data['data']['refreshToken'];
                 

@@ -28,41 +28,57 @@ class BookingDetailScreen extends StatelessWidget {
           orElse: () => booking,
         );
 
-        return Scaffold(
-          bottomNavigationBar: _buildActionBar(context, currentBooking),
-          body: CustomScrollView(
-            slivers: [
-              _buildSliverAppBar(context, currentBooking),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(currentBooking),
-                      const SizedBox(height: 32),
-                      _buildDetailSection("Customer Details", [
-                        _detailRow(Icons.email_outlined, currentBooking.customerEmail),
-                        _detailRow(Icons.calendar_today_outlined, _formatDate(currentBooking.dateTime)),
-                      ]),
-                      const SizedBox(height: 32),
-                      _buildDetailSection("Service Details", [
-                        _detailRow(Icons.restaurant_menu_outlined, currentBooking.service.name),
-                        _detailRow(Icons.description_outlined, currentBooking.service.description ?? "No description provided"),
-                        _detailRow(Icons.timer_outlined, currentBooking.service.duration ?? "Flexible duration"),
-                        _detailRow(Icons.currency_rupee, "${currentBooking.service.rate} / person"),
-                      ]),
-                      const SizedBox(height: 32),
-                      _buildStaffAssignment(context, currentBooking),
-                      const SizedBox(height: 32),
-                      if (isOwner) _buildPaymentStatus(currentBooking),
-                      if (!isOwner) _buildStaffTasks(currentBooking),
-                      const SizedBox(height: 100),
-                    ],
-                  ),
+        return BlocListener<OwnerCubit, OwnerState>(
+          listenWhen: (p, c) => p.isLoading != c.isLoading && !c.isLoading,
+          listener: (context, state) {
+            state.bookingFailureOrSuccess.fold(
+              () => null,
+              (either) => either.fold(
+                (f) => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Failed to update status"), backgroundColor: Colors.redAccent),
+                ),
+                (_) => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Booking status updated successfully"), backgroundColor: Colors.green),
                 ),
               ),
-            ],
+            );
+          },
+          child: Scaffold(
+            bottomNavigationBar: _buildActionBar(context, currentBooking, state.isLoading),
+            body: CustomScrollView(
+              slivers: [
+                _buildSliverAppBar(context, currentBooking),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(currentBooking),
+                        const SizedBox(height: 32),
+                        _buildDetailSection("Customer Details", [
+                          _detailRow(Icons.email_outlined, currentBooking.customerEmail),
+                          _detailRow(Icons.calendar_today_outlined, _formatDate(currentBooking.dateTime)),
+                        ]),
+                        const SizedBox(height: 32),
+                        _buildDetailSection("Service Details", [
+                          _detailRow(Icons.restaurant_menu_outlined, currentBooking.service.name),
+                          _detailRow(Icons.description_outlined, currentBooking.service.description ?? "No description provided"),
+                          _detailRow(Icons.timer_outlined, currentBooking.service.duration ?? "Flexible duration"),
+                          _detailRow(Icons.currency_rupee, "${currentBooking.service.rate} / person"),
+                        ]),
+                        const SizedBox(height: 32),
+                        _buildStaffAssignment(context, currentBooking),
+                        const SizedBox(height: 32),
+                        if (isOwner) _buildPaymentStatus(currentBooking),
+                        if (!isOwner) _buildStaffTasks(currentBooking),
+                        const SizedBox(height: 100),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -381,8 +397,8 @@ class BookingDetailScreen extends StatelessWidget {
     }
   }
 
-  Widget? _buildActionBar(BuildContext context, BookingModel booking) {
-    if (booking.status == "Completed" || booking.status == "Cancelled") {
+  Widget? _buildActionBar(BuildContext context, BookingModel booking, bool isLoading) {
+    if (booking.status == "Finished" || booking.status == "Completed" || booking.status == "Cancelled") {
       return null;
     }
 
@@ -401,8 +417,14 @@ class BookingDetailScreen extends StatelessWidget {
         ],
       ),
       child: SafeArea(
-        child: Row(
-          children: _getActionButtons(context, booking),
+        child: Opacity(
+          opacity: isLoading ? 0.5 : 1.0,
+          child: IgnorePointer(
+            ignoring: isLoading,
+            child: Row(
+              children: _getActionButtons(context, booking),
+            ),
+          ),
         ),
       ),
     );
@@ -434,7 +456,7 @@ class BookingDetailScreen extends StatelessWidget {
           ),
         ),
       );
-    } else if (booking.status == "Approved" || booking.status == "Accepted") {
+    } else if (booking.status == "Approved" || booking.status == "Accepted" || booking.status == "Confirmed") {
       final bool isPaid = booking.paymentStatus == "Paid" || booking.razorpayOrderId != null;
 
       if (!isPaid && isOwner) {
@@ -455,7 +477,7 @@ class BookingDetailScreen extends StatelessWidget {
               context,
               "Move to Kitchen",
               AppTheme.ownerAccent,
-              () => context.read<OwnerCubit>().updateBookingStatus(booking.id!, "In Kitchen"),
+              () => _confirmStatusChange(context, booking, "In Kitchen", "Move this booking to the kitchen?"),
             ),
           ),
         );
@@ -467,7 +489,7 @@ class BookingDetailScreen extends StatelessWidget {
             context,
             "Mark as Dispatched",
             Colors.blueAccent,
-            () => context.read<OwnerCubit>().updateBookingStatus(booking.id!, "Dispatched"),
+            () => _confirmStatusChange(context, booking, "Dispatched", "Mark this order as Dispatched?"),
           ),
         ),
       );
@@ -476,9 +498,9 @@ class BookingDetailScreen extends StatelessWidget {
         Expanded(
           child: _actionButton(
             context,
-            "Order Completed",
+            "Finish Order",
             Colors.greenAccent,
-            () => context.read<OwnerCubit>().updateBookingStatus(booking.id!, "Completed"),
+            () => _confirmStatusChange(context, booking, "Finished", "Mark this order as Finished?"),
           ),
         ),
       );

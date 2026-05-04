@@ -154,6 +154,9 @@ class _LoginPageState extends State<LoginPage> {
         serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
       );
       
+      // Clear previous sign-in to force account selection
+      await googleSignIn.signOut();
+      
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) return; // User cancelled
 
